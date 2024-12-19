@@ -38,18 +38,10 @@ swayidle-ctrl -off
 ## Installation
 
 1. Download the source code or clone the repository (if applicable).
-2. Run `go build` to create the executable file (`swayidle-manager`).
+2. Run `go build` to create the executable file (`swayidle-ctrl`).
 3. Place the executable in a directory accessible from your PATH environment variable.
 
 **Alternatively, you can run the application directly from the source code using `go run main.go`.**
-
-### Dependencies
-
-This application requires the following Go package:
-
-* `github.com/shirou/gopsutil/process` - for process management functionalities.
-
-**Make sure you have these dependencies installed before running the application.**
 
 ### Additional Notes
 

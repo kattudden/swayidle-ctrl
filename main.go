@@ -1,23 +1,49 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
+	"os"
 	"os/exec"
+	"strconv"
+	"strings"
 	"syscall"
-
-	"github.com/shirou/gopsutil/process"
 )
 
 func killSwayidleProcess() error {
-	processes, _ := process.Processes()
-	for _, process := range processes {
-		name, _ := process.Name()
-		if name == "swayidle" {
-			err := process.Kill()
-			if err != nil {
-				return err
-			}
+	command := "ps -ef | grep swayidle | grep -v grep | grep -v ctrl"
+	cmd := exec.Command("sh", "-c", command)
+
+	output, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+
+	scanner := bufio.NewScanner(strings.NewReader(string(output)))
+	var pids []string
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) >= 2 {
+			pids = append(pids, fields[1])
+		}
+	}
+
+	// Beenden der Prozesse
+	for _, pidStr := range pids {
+		pid, err := strconv.Atoi(pidStr)
+		if err != nil {
+			return err
+		}
+
+		proc, err := os.FindProcess(pid)
+		if err != nil {
+			continue
+		}
+
+		err = proc.Kill()
+		if err != nil {
+			return err
 		}
 	}
 	return nil

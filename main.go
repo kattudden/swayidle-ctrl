@@ -1,59 +1,14 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
-	"os"
 	"os/exec"
-	"strconv"
-	"strings"
-	"syscall"
 )
 
-func killSwayidleProcess() error {
-	command := "ps -ef | grep swayidle | grep -v grep | grep -v ctrl"
+func startSwayidleService() error {
+	command := "systemctl --user start swayidle.service"
 	cmd := exec.Command("sh", "-c", command)
-
-	output, err := cmd.Output()
-	if err != nil {
-		return nil
-	}
-
-	scanner := bufio.NewScanner(strings.NewReader(string(output)))
-	var pids []string
-	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
-		if len(fields) >= 2 {
-			pids = append(pids, fields[1])
-		}
-	}
-
-	// Beenden der Prozesse
-	for _, pidStr := range pids {
-		pid, err := strconv.Atoi(pidStr)
-		if err != nil {
-			return err
-		}
-
-		proc, err := os.FindProcess(pid)
-		if err != nil {
-			continue
-		}
-
-		err = proc.Kill()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func createSwayidleProcess(t1, t2 int) error {
-	command := fmt.Sprintf("swayidle -w timeout %d 'swaylock -f -c 3B4252' timeout %d 'swaymsg \"output * power off\"' resume 'swaymsg \"output * power on\"' before-sleep 'swaylock -f -c 3B4252'", t1, t2)
-	cmd := exec.Command("sh", "-c", command)
-
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 
 	err := cmd.Start()
 	if err != nil {
@@ -63,23 +18,67 @@ func createSwayidleProcess(t1, t2 int) error {
 	return nil
 }
 
-func main() {
-	t1 := flag.Int("t1", 300, "Set timeout for screenlock.")
-	t2 := flag.Int("t2", 600, "Set timeout for display.")
-	disable := flag.Bool("off", false, "Disable screenlock and display timeout.")
+func stopSwayidleService() error {
+	command := "systemctl --user stop swayidle.service"
+	cmd := exec.Command("sh", "-c", command)
 
+	err := cmd.Start()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func getSwayidleServiceStatus() (bool, error) {
+	command := "systemctl --user is-active --quiet swayidle.service"
+	cmd := exec.Command("sh", "-c", command)
+
+	err := cmd.Run()
+	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			/*
+				Get exit code to evaluate service status.
+				3 == not Running.
+				Everything else indicating an Error.
+			*/
+			if exitError.ExitCode() == 3 {
+				return false, nil
+			}
+		}
+		return false, err
+	}
+
+	// Der Service läuft
+	return true, nil
+}
+
+func main() {
+	enable := flag.Bool("on", false, "Enable screenlock and display timeout.")
+	disable := flag.Bool("off", false, "Disable screenlock and display timeout.")
 	flag.Parse()
 
-	// kill running swayidle instance.
-	err := killSwayidleProcess()
+	// check current status of swayidle service.
+	isRunning, err := getSwayidleServiceStatus()
 	if err != nil {
 		panic(err)
 	}
 
-	if !*disable {
-		err := createSwayidleProcess(*t1, *t2)
+	// start service if not already running.
+	if *enable && !isRunning {
+		err := startSwayidleService()
 		if err != nil {
-			panic(err)
+			fmt.Println("Failed to start swayidle Service!")
+			return
+		}
+	}
+
+	// stop service if not already stoped.
+	if *disable && isRunning {
+		err := stopSwayidleService()
+		if err != nil {
+			fmt.Println("Failed to stop swayidle Service!")
+			return
 		}
 	}
 }
